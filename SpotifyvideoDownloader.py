@@ -1,4 +1,5 @@
 from youtube_search import YoutubeSearch
+from datetime import datetime
 import pprint as p, io, time, json
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -40,6 +41,7 @@ if __name__ == "__main__":
     isOn = False
     count = 0
     playlist = []
+    xI = 0
 
     def dispatchSearch():
         searchSpotify()
@@ -50,16 +52,35 @@ if __name__ == "__main__":
         choice = ytdchoices.get()
         #for every song in the playlist, download the wanted one
         if count + 1 < len(playlist):
-            count += 1
-            YT = searchYT(playlist[count])
+            YT = searchYT(playlist[count]['name'] + " " + playlist[count]['artists'][0]['name'])
             if YT is not None:
                 if len(YT) == 5:
-                    x = 0
-                    if isOn:
-                        x = input('0 - 4 ? : ')
-                    Thread(target = download, args = (YT[int(x)], dirname, choice, )).start()
-                    CurrentOp.insert(count, '\n Downloading... \n' + YT[int(x)]['title'])
+
+                    def findX():
+                        global xI
+                        if isOn and xI + 1 < len(YT):
+                            manCheck.insert(xI, YT[xI]['title'])
+                            xI += 1
+                            root.after(1000, findX)
+                        elif xI + 1 >= len(playlist):
+                            while True:
+                                selection = manCheck.curselection()
+                                if selection != None:
+                                    return selection[0]
+                        else:
+                            for i in range(len(YT)):
+                                durSong = datetime.strptime(YT[i]['duration'], '%M:%S').time()
+                                durMax = datetime.strptime('5:00', '%M:%S').time()
+                                if durSong < (durMax):
+                                    return i
+                            return None
+
+                    x = findX()
+                    if x is not None:   
+                        Thread(target = download, args = (YT[int(x)], dirname, choice, )).start()
+                        CurrentOp.insert(count, '\n Downloading... \n' + YT[int(x)]['title'])
             root.after(1000,dispatchDownload)
+        count += 1
 
     def searchYT(req):
         try:
@@ -78,12 +99,13 @@ if __name__ == "__main__":
         try:
             results = sp.user_playlist(username, playlist_id, 'tracks')
         except:
-            raise ValueError("URI not found")
+            ytdError.config(text="Error, URI not found")
         for i in range(0, len(results['tracks']['items'])):
-            r = results['tracks']['items'][i]['track']['name']
+            r = results['tracks']['items'][i]['track']
             playlist.append(r)
-            DisPlay.insert(i, r)
-        root.after(1000, dispatchDownload)
+            DisPlay.insert(i, r['name'] + " " + r['artists'][0]['name'])
+        if len(playlist) > 0:
+            root.after(1000, dispatchDownload)
         
     
 #tkinter functions
@@ -125,7 +147,7 @@ if __name__ == "__main__":
 
     root = tk.Tk()
     root.title("Spotify_video_Downloader")
-    root.geometry("1400x800")
+    root.geometry("1500x800")
 
     #__end def screen__
 
@@ -133,11 +155,11 @@ if __name__ == "__main__":
     #define needed attributes
     #Ytd Link Label
     SpUrl = tk.StringVar()
-    ytdLabel = tk.Label(root,text="Enter Spotify URL",font=("Arial",15))
+    ytdLabel = tk.Label(root,text="Enter Spotify URI",font=("Arial",15))
     ytdLabel.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 0, sticky = "nsew")
 
     #Entry Box
-    ytdEntry = tk.Entry(root,width=50)
+    ytdEntry = tk.Entry(root,width=50, font=("Arial", 10))
     ytdEntry.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 1, sticky = "nsew")
 
     #Error Msg
@@ -145,11 +167,11 @@ if __name__ == "__main__":
     ytdError.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 2,sticky = "nsew")
 
     #Asking save file label
-    saveLabel = tk.Label(root,text="Video Directory",font=("Arial",15,"bold"))
+    saveLabel = tk.Label(root,text="Choose Download Directory",font=("Arial",15,"bold"))
     saveLabel.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 3, sticky = "nsew")
 
     #btn of save file
-    saveEntry = tk.Button(root,width=10,bg="red",fg="white",text="Choose Path",command=select_dir)
+    saveEntry = tk.Button(root,width=10,bg="red",fg="white",text="Choose Path", font =("Arial",12, "bold"), command=select_dir)
     saveEntry.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 4, sticky = "nsew")
 
     #Error Msg location
@@ -162,11 +184,11 @@ if __name__ == "__main__":
 
     #combobox
     choices = ["720p","144p","Only Audio"]
-    ytdchoices = ttk.Combobox(root,values=choices)
+    ytdchoices = ttk.Combobox(root,values=choices, font =("Arial",12, "bold"))
     ytdchoices.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 7, sticky = "nsew")
 
     #donwload btn
-    downloadbtn = tk.Button(root,text="Donwload",width=10,bg="red",fg="white",command=dispatchSearch)
+    downloadbtn = tk.Button(root,text="Donwload",width=10,bg="red",fg="white",font =("Arial",12, "bold"), command=dispatchSearch)
     downloadbtn.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, row = 8, sticky = "nsew")
 
     SwitchMessage = tk.Label(root,text="Enable Manual Check? (WIP)",fg="black",font=("Arial",15))
@@ -178,17 +200,24 @@ if __name__ == "__main__":
     Automatic_Toggle.grid(pady = 5, ipady = 15, ipadx = 15, padx = 10, column = 1, sticky = "nsew")
 
     DisPlay = tk.Listbox(root, width = 60, height = 49)
-    scroll = ttk.Scrollbar(root)
-    scroll.config(command = DisPlay.yview)
-    DisPlay.config(yscrollcommand = scroll.set)
+    ScrollPlay = ttk.Scrollbar(root)
+    ScrollPlay.config(command = DisPlay.yview)
+    DisPlay.config(yscrollcommand = ScrollPlay.set)
     DisPlay.grid(column = 3, row = 0, sticky = "W", rowspan = 20)
-    scroll.grid(column = 4, row = 0, sticky = "NSE", rowspan = 20)
+    ScrollPlay.grid(column = 4, row = 0, sticky = "NSE", rowspan = 20)
 
     CurrentOp = tk.Listbox(root, width = 60, height = 49)
-    scroll = ttk.Scrollbar(root)
-    scroll.config(command = CurrentOp.yview)
-    CurrentOp.config(yscrollcommand = scroll.set)
+    ScrollOp = ttk.Scrollbar(root)
+    ScrollOp.config(command = CurrentOp.yview)
+    CurrentOp.config(yscrollcommand = ScrollOp.set)
     CurrentOp.grid(column = 5, row = 0, sticky = "W", rowspan = 20)
-    scroll.grid(column = 6, row = 0, sticky = "NSE", rowspan = 20)
+    ScrollOp.grid(column = 6, row = 0, sticky = "NSE", rowspan = 20)
+
+    manCheck = tk.Listbox(root, width = 50, height = 49, selectmode = 'SINGLE')
+    ScrollCheck = ttk.Scrollbar(root)
+    ScrollCheck.config(command = manCheck.yview)
+    manCheck.config(yscrollcommand = ScrollCheck.set)
+    manCheck.grid(column = 7, row = 0, sticky = "W", rowspan = 20)
+    ScrollCheck.grid(column = 8, row = 0, sticky = "NSE", rowspan = 20)
 
     tk.mainloop()
